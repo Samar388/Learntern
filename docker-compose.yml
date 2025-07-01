@@ -1,18 +1,39 @@
+version: '3.9'
+
 services:
+  # Backend Service (PHP/Laravel)
   app:
     build:
-      context: .
-      dockerfile: backend/docker/Dockerfile
+      context: ./backend
+      dockerfile: docker/Dockerfile
     container_name: learntern-backend
     restart: unless-stopped
     volumes:
-      - ./:/var/www/html
-      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - ./backend:/var/www/html
+      - ./backend/docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
       - laravel-network
     depends_on:
       - db
 
+  # Frontend Service (Node.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: docker/Dockerfile
+    container_name: learntern-frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://app
+    networks:
+      - laravel-network
+    depends_on:
+      - app
+
+  # Web Server (Nginx)
   webserver:
     image: nginx:alpine
     container_name: laravel-nginx
@@ -20,13 +41,16 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./:/var/www/html
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./backend:/var/www/html
+      - ./backend/docker/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./backend/docker/supervisord.conf:/etc/supervisord.conf
     networks:
       - laravel-network
     depends_on:
       - app
+      - frontend
 
+  # Database (MySQL)
   db:
     image: mysql:8.0
     container_name: laravel-mysql
